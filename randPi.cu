@@ -70,6 +70,15 @@ int main(int argc,char ** argv)
 	dim3 grid(num);
 	dim3 block(DIM_X,DIM_Y,DIM_Z);
 	inCircle<<<grid,block>>> (aixX_d,aixY_d,pntsInCir_d);
+
+	cudaError_t err = cudaGetLastError();
+	/* if we make very large thread block > 1024,then there will be an error */
+	if (err != cudaSuccess)
+	{
+		printf("kernel execution failed with error code %d\n",err);
+		exit(1);
+	}
+
 	CUDA_CALL  (cudaMemcpy(pntsInCir_h,pntsInCir_d,sizeof(int) * numElems,cudaMemcpyDeviceToHost));
 
 	int i = 0;
