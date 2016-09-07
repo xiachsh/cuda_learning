@@ -2,74 +2,89 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <limits.h>
+
 #include <curand.h>
+#include <limits.h>
+
+#define DIM_X 10
+#define DIM_Y 10
+#define DIM_Z 10
 
 
-
-#define CUDA_CALL(x) do { if((x)!=cudaSuccess) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__);\
-    return EXIT_FAILURE;}} while(0)
-#define CURAND_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__);\
-    return EXIT_FAILURE;}} while(0)
-
-__global__ void largerThanOne(float *x,float *y,unsigned int *pnts)
+void usage(int argc,char ** argv)
 {
-	int idx = threadIdx.x;
-	if (x[idx] * x[idx] + y[idx] * y[idx] <= 1) {
-		pnts[idx] = 1;
-	}
+	printf("%s usage:\n",argv[0]);
+	printf("	:%s num\n",argv[0]);
+	exit(1);
+}
+
+__global__ void inCircle(float * x ,float * y, int * pnts)
+{
+	int idx = (gridDim.y * blockIdx.x + blockIdx.y )*blockDim.x*blockDim.y*blockDim.z + blockDim.z*blockDim.y*threadIdx.x + blockDim.z*threadIdx.y + threadIdx.z;
+
+	if (x[idx]*x[idx] + y[idx]*y[idx] <= 1)
+		pnts[idx] = 1; 
 }
 
 
-int main(void)
+#define CUDA_CALL(x) \
+	if ((x)!= cudaSuccess)  { \
+		printf("%s %s failed\n",__FILE__,__LINE__); \
+		exit(1); }
+#define CURAND_CALL(x) \
+	if ((x) != CURAND_STATUS_SUCCESS) { \
+		printf("%s %s failed\n",__FILE__,__LINE__); \
+		exit(1); }
+int main(int argc,char ** argv)
 {
 
-	float * pntsX;
-	float * pntsY;
 
-	unsigned int *pnts_h = 0;
-	unsigned int *pnts = 0;
-	unsigned int totalPnts = 0;
+	int num = 0;
+	if (argc != 2) 
+		usage(argc,argv);
+	else 
+		num = atoi(argv[1]);
+
+	
+	float * aixX_d;
+	float * aixY_d;
 
 	curandGenerator_t gen;
+	long long numElems = num * DIM_X * DIM_Y * DIM_Z;
+	int * pntsInCir_d,* pntsInCir_h;
+	CUDA_CALL (cudaMalloc((void **) &aixX_d,sizeof(float) * numElems));
+	CUDA_CALL (cudaMalloc((void **) &aixY_d,sizeof(float) * numElems));
 	
-	int elems = 1024;
-	int iteration = 1;
-	int nBytes = elems * sizeof(float);	
+	CURAND_CALL (curandCreateGenerator(&gen,CURAND_RNG_PSEUDO_DEFAULT));
+	CURAND_CALL (curandSetPseudoRandomGeneratorSeed(gen,12321321ULL));
+	CURAND_CALL (curandGenerateUniform(gen, aixX_d, numElems));
 
-	cudaMalloc((void **) (&pntsX),nBytes);
-	cudaMalloc((void **) (&pntsY),nBytes);
+	CURAND_CALL (curandSetPseudoRandomGeneratorSeed(gen,21321321ULL));
+	CURAND_CALL (curandGenerateUniform(gen, aixY_d, numElems));
 
-	CURAND_CALL(curandCreateGenerator(&gen,CURAND_RNG_PSEUDO_DEFAULT));
-	CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen,1234ULL));
-	CURAND_CALL(curandGenerateUniform(gen,pntsX,elems));
 
+	CUDA_CALL  (cudaMalloc((void **) &pntsInCir_d,sizeof(int) * numElems));
+	CUDA_CALL  (cudaMemset(pntsInCir_d,0,sizeof(int) * numElems));
+	pntsInCir_h = (int *) malloc(sizeof(int) * numElems);
 	
-	CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen,2345ULL));
-	CURAND_CALL(curandGenerateUniform(gen,pntsY,elems));
-	
+	dim3 grid(num);
+	dim3 block(DIM_X,DIM_Y,DIM_Z);
+	inCircle<<<grid,block>>> (aixX_d,aixY_d,pntsInCir_d);
+	CUDA_CALL  (cudaMemcpy(pntsInCir_h,pntsInCir_d,sizeof(int) * numElems,cudaMemcpyDeviceToHost));
 
-	cudaMalloc((void **)&pnts,sizeof(unsigned int)*elems);
-	cudaMemset(pnts,0,sizeof(unsigned int)*elems);
-	
-	largerThanOne<<<1,elems>>>(pntsX,pntsY,pnts);
-        pnts_h = (unsigned int *) malloc(sizeof(unsigned int)*elems);	
-	cudaMemcpy(pnts_h,pnts,sizeof(unsigned int)*elems,cudaMemcpyDeviceToHost);
 	int i = 0;
-	int _pnts = 0;
-	for (i=0;i<elems;i++)
-		_pnts += pnts_h[i];
-	printf("pi is roughly about %f\n",(float)_pnts * 4 / elems);
+ 	long long totalCnt = 0;
+	for (i=0;i<numElems;i++) {
+		if (pntsInCir_h[i]) 
+			totalCnt++;
+	}	
 
+	float pi = (float) totalCnt * 4 / numElems;
 
-	 CURAND_CALL(curandDestroyGenerator(gen));
-	cudaFree(pnts);
-	cudaFree(pntsX);
-	cudaFree(pntsY);
-
-	free(pnts_h);
-
+	printf("pi is roughly about %f\n",pi);
+	free(pntsInCir_h);
+	CUDA_CALL  (cudaFree(pntsInCir_d));
+	CUDA_CALL  (cudaFree(aixX_d));
+	CUDA_CALL  (cudaFree(aixY_d));
 	return 0;
 }
