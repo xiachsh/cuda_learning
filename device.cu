@@ -21,6 +21,7 @@ int main()
         {
 		cudaDeviceProp deviceProp;
 		cudaGetDeviceProperties(&deviceProp,i);
+                // major version 6: pascal
 		// major version 5: Maxwell
 		// major versopm 3: kepler
 	        // major version 2: Fermi
