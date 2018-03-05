@@ -87,7 +87,7 @@ int main(int argc,char **argv)
 
 	int c ;
 
-	while  ( (c = getopt(argc,argv,"x:y:i:j")) != -1 ) {
+	while  ( (c = getopt(argc,argv,"x:y:i:j:")) != -1 ) {
 	
 		switch (c) 
  		{
@@ -101,7 +101,7 @@ int main(int argc,char **argv)
 				blockDimX = atoi(optarg);
 				break;
 			case 'j':
-				blockDimX = atoi(optarg);
+				blockDimY = atoi(optarg);
 				break;
 			default :
 				usage(argc,argv);
