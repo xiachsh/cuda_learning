@@ -144,6 +144,7 @@ int main(int argc,char **argv)
 	matrixSum<<<b,g>>>(d_matrixA,d_matrixB,d_matrixC);
 	err = cudaGetLastError(); 		\
 	printf("cuda function failure at line %d :%s \n",__LINE__,cudaGetErrorString(err));	\
+	cudaDeviceSynchronize();
 	gettimeofday(&end,NULL);
 	printf("%ld  usec elapsed for caculation on GPU\n",USEC_ELAPSED(start,end));
 	
