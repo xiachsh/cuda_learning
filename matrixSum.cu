@@ -120,6 +120,7 @@ int main(int argc,char **argv)
 	CHECK_RET (cudaMalloc(&d_matrixA,nBytes));
 	CHECK_RET (cudaMalloc(&d_matrixB,nBytes));
 	CHECK_RET (cudaMalloc(&d_matrixC,nBytes));
+	CHECK_RET (cudaMalloc(&d_matrixD,nBytes));
 	
 	int i = 0 ;
 	for (; i < nElems; i++) 
